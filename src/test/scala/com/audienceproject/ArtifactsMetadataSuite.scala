@@ -22,7 +22,7 @@ class ArtifactsMetadataSuite extends FunSuite with BeforeAndAfterEach {
     }
 
     test("Test adding artifacts, scanning and querying") {
-        val metadata = Map("iterations" -> 3, "optimizer" -> "adam")
+        val metadata = Map("iterations" -> 3, "sgd-optimizer" -> "adam")
 
         val uuid = client.log(testType, metadata=metadata)
 
@@ -36,7 +36,7 @@ class ArtifactsMetadataSuite extends FunSuite with BeforeAndAfterEach {
     }
 
     test("Test scanning for conflicting queries resolved by timestamp") {
-        val metadata = Map("iterations" -> 3, "optimizer" -> "adam")
+        val metadata = Map("iterations" -> 3, "sgd-optimizer" -> "adam")
 
         val uuid1 = client.log(testType, metadata=metadata)
         val uuid2 = client.log(testType, metadata=metadata)
@@ -47,7 +47,7 @@ class ArtifactsMetadataSuite extends FunSuite with BeforeAndAfterEach {
     }
 
     test("Test resolve reference time") {
-        val metadata = Map("iterations" -> 3, "optimizer" -> "adam")
+        val metadata = Map("iterations" -> 3, "sgd-optimizer" -> "adam")
 
         val uuid1 = client.logWithReferenceTime(testType,2019, 1, 30, metadata=metadata)
         val uuid2 = client.logWithReferenceTimeAsDateString(testType, "2019-10-12", metadata=metadata)

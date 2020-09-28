@@ -68,10 +68,11 @@ class ArtifactsMetadataClient(dynamoDbClient: AmazonDynamoDB = AmazonDynamoDBCli
     def getLatestBefore(artifactType: String, yyyy: Int, mm: Int, dd: Int, latest: Boolean = true, metadata: Map[String, Any] = Map.empty[String, String]): Option[ArtifactMetadata] = {
         val latestBeforeExpression: String = s"$yearKey <= :$yearKey and ($yearKey <> :$yearKey or $monthKey <= :$monthKey) and (($yearKey <> :$yearKey or $monthKey <> :$monthKey) or $dayKey <= :$dayKey)"
         val attributes = metadata.toSeq :+ (artifactTypeKey, artifactType)
+        val attributeNameOrder = getAttributeNameOrder(attributes.map({ case (k, _) => k }))
 
-        val placeholderNames: Map[String, String] = getExpressionKeyPlaceholderNames(attributes.map({ case (k, _) => k }))
-        val filterExpression = Seq(toFilterExpression(placeholderNames.toSeq), latestBeforeExpression).mkString(" and ")
-        val valueMap = toValueMap(attributes).withInt(s":$yearKey", yyyy).withInt(s":$monthKey", mm).withInt(s":$dayKey", dd)
+        val placeholderNames: Map[String, String] = getExpressionKeyPlaceholderNames(attributeNameOrder)
+        val filterExpression = Seq(toFilterExpression(placeholderNames.toSeq, attributeNameOrder), latestBeforeExpression).mkString(" and ")
+        val valueMap = toValueMap(attributes, attributeNameOrder).withInt(s":$yearKey", yyyy).withInt(s":$monthKey", mm).withInt(s":$dayKey", dd)
 
         table.scan(filterExpression, placeholderNames.asJava, valueMap)
           .asScala
@@ -122,9 +123,10 @@ class ArtifactsMetadataClient(dynamoDbClient: AmazonDynamoDB = AmazonDynamoDBCli
      */
     def getByType(artifactType: String, latest: Boolean = true, metadata: Map[String, Any] = Map.empty[String, String]): Option[ArtifactMetadata] = {
         val attributes = metadata.toSeq :+ (artifactTypeKey, artifactType)
-        val placeholderNames: Map[String, String] = getExpressionKeyPlaceholderNames(attributes.map({ case (k, _) => k }))
+        val attributeNameOrder = getAttributeNameOrder(attributes.map({ case (k, _) => k }))
+        val placeholderNames: Map[String, String] = getExpressionKeyPlaceholderNames(attributeNameOrder)
 
-        table.scan(toFilterExpression(placeholderNames.toSeq), placeholderNames.asJava, toValueMap(attributes))
+        table.scan(toFilterExpression(placeholderNames.toSeq, attributeNameOrder), placeholderNames.asJava, toValueMap(attributes, attributeNameOrder))
           .asScala
           .map(item => toScalaObject(item))
           .toSeq
@@ -138,23 +140,29 @@ class ArtifactsMetadataClient(dynamoDbClient: AmazonDynamoDB = AmazonDynamoDBCli
           .headOption
     }
 
-    def getExpressionKeyPlaceholderNames(attributesNames: Seq[String]): Map[String, String] = {
+    def getAttributeNameOrder(attributesNames: Seq[String]): Map[String, Int] = {
         val increasing = 0 to attributesNames.size
         attributesNames
           .zip(increasing)
+          .map({ case (keyName, i) => (keyName, i) })
+          .toMap
+    }
+
+    def getExpressionKeyPlaceholderNames(attributesNameOrder: Map[String, Int]): Map[String, String] = {
+        attributesNameOrder
           .map({ case (keyName, i) => (keyName, s"#$i") })
           .foldLeft(Map.empty[String, String])({ case (map: Map[String, String], (name: String, placeholder: String)) => map + (placeholder -> name) })
     }
 
-    private def toFilterExpression(placeholderNames: Seq[(String, String)]): String = {
+    private def toFilterExpression(placeholderNames: Seq[(String, String)], attributeNameOrder: Map[String, Int]): String = {
         placeholderNames
-          .map({ case (k, v) => s"$k = :$v" })
+          .map({ case (k, v) => s"$k = :${attributeNameOrder(v)}" })
           .mkString(" and ")
     }
 
-    private def toValueMap(attributes: Seq[(String, Any)]): ValueMap = {
+    private def toValueMap(attributes: Seq[(String, Any)], attributeNameOrder: Map[String, Int]): ValueMap = {
         attributes
-          .foldLeft(new ValueMap())({ case (valueMap, (key, value)) => put(s":$key", value, valueMap) })
+          .foldLeft(new ValueMap())({ case (valueMap, (key, value)) => put(s":${attributeNameOrder(key)}", value, valueMap) })
     }
 
     def getByUuid(uuid: String): Option[ArtifactMetadata] = {
