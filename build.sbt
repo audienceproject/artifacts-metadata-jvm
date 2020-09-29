@@ -14,7 +14,7 @@ name := "artifacts-metadata"
 /**
   * The version must match "&#94;(\\d+\\.\\d+\\.\\d+)$" to be considered a release
   */
-version := "1.0.0"
+version := "1.0.1"
 description := "A simple library for managing artifacts with complex metadata."
 
 scalaVersion := "2.12.12"
